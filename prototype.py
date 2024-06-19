@@ -39,7 +39,7 @@ class TextEncoder:
 
             line = line.strip()
 
-            self.word_indexes[line] = index
+            self.word_indexes[line.encode()] = index
             self.words.append(line)
             self.avg_len += len(line)
 
@@ -50,21 +50,21 @@ class TextEncoder:
 
         self.avg_len /= index - RESERVED_WORDS
 
-    def encode_word(self, word: str) -> bytes:
-        if word == ' ':
+    def encode_word(self, word: bytes) -> bytes:
+        if word == b' ':
             return SPACE_BYTE
-        elif word == '\n':
+        elif word == b'\n':
             return NEWLINE_BYTE
 
         # logging.debug(f"Encoding word \"{word}\"")
 
-        if ' ' in word:
+        if b' ' in word:
             # logging.debug("Space found in word while encoding")
             return
         elif word not in self.word_indexes:
             output = FLAG_BYTE
 
-            output += word.encode('utf-8')
+            output += word
 
             output += FLAG_BYTE
 
@@ -91,10 +91,13 @@ class TextEncoder:
 
         return int(b, 2).to_bytes(len(b) // 8, byteorder='big')
 
-    def encode(self, raw: str) -> bytes:
+    def encode(self, raw: bytes | str) -> bytes:
+        if type(raw) == str:
+            raw = raw.encode()
+
         out = bytes()
 
-        space_index: int = raw.find(' ')
+        space_index: int = raw.find(b' ')
         while (space_index != -1):
 
             out += self.encode_word(raw[:space_index])
@@ -103,7 +106,7 @@ class TextEncoder:
             raw = raw[space_index+1:]
             logging.debug(raw)
 
-            space_index = raw.find(' ')
+            space_index = raw.find(b' ')
 
         out += self.encode_word(raw) # Encode the last word
 
@@ -155,7 +158,7 @@ class TextEncoder:
             for line in file.readlines():
                 write_bytes += self.encode(line)
 
-        new_file_path = 'encoded-' + file_path
+        new_file_path = file_path[:len(file_path) - len(file_path.split('.')[-1]) - 1] + '-encoded.' + file_path.split('.')[-1]
         with open(new_file_path, 'wb+') as file:
             file.write(write_bytes)
 
