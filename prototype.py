@@ -2,7 +2,7 @@ import logging
 import timeit
 
 FORMAT = "%(levelname)s - %(message)s"
-logging.basicConfig(encoding="utf-8", level=logging.DEBUG, format=FORMAT)
+logging.basicConfig(encoding="utf-8", level=logging.INFO, format=FORMAT)
 
 SPACE_BYTE = (0).to_bytes(1, byteorder='big')
 FLAG_BYTE = (1).to_bytes(1, byteorder='big')
@@ -166,12 +166,12 @@ class TextEncoder:
         t = ""
         with open(file_path, 'rb') as file:
             for line in file.readlines():
-                t += foo.decode(line)
+                t += self.decode(line)
 
         return t
 
 
-foo = TextEncoder('./wiki-100k.txt')
+# foo = TextEncoder('./wiki-100k.txt')
 
 # sample = "The quick brown fox jumped over the lazy dog"
 
@@ -185,8 +185,8 @@ foo = TextEncoder('./wiki-100k.txt')
 # print("UTF-8")
 # print(len(sample.encode('utf-8')))
 
-x = foo.encode_file('test.txt')
-print(foo.decode_file(x))
+# x = foo.encode_file('test.txt')
+# print(foo.decode_file(x))
 
 
 
@@ -198,34 +198,34 @@ print(foo.decode_file(x))
 # print(foo.words[i])
 
 
-exit()
+# exit()
 
 
 
-utf = sample.encode()
-trials = 100
+# utf = sample.encode()
+# trials = 100
 
-t = timeit.Timer(sample.encode)
-utf_time = t.timeit(trials)
+# t = timeit.Timer(sample.encode)
+# utf_time = t.timeit(trials)
 
 
-output = foo.encode(sample)
+# output = foo.encode(sample)
 
-t = timeit.Timer(lambda: foo.encode(sample))
-mine_time = t.timeit(trials)
+# t = timeit.Timer(lambda: foo.encode(sample))
+# mine_time = t.timeit(trials)
 
-print("My Text Encoder")
-print(output)
-print(len(output))
-print(f"My time: {mine_time}")
-print("UTF-8")
-print(utf)
-print(len(utf))
-print(f"UTF Time: {utf_time}")
+# print("My Text Encoder")
+# print(output)
+# print(len(output))
+# print(f"My time: {mine_time}")
+# print("UTF-8")
+# print(utf)
+# print(len(utf))
+# print(f"UTF Time: {utf_time}")
 
-percent_gain = round(len(output) * 100/len(utf), 3)
+# percent_gain = round(len(output) * 100/len(utf), 3)
 
-print(f'\nGain: {percent_gain}%')
+# print(f'\nGain: {percent_gain}%')
 
 # with open('out', 'wb+') as file:
 #     file.write(output)
