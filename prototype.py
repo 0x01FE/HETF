@@ -1,5 +1,4 @@
 import logging
-import timeit
 
 FORMAT = "%(levelname)s - %(message)s"
 logging.basicConfig(encoding="utf-8", level=logging.INFO, format=FORMAT)
@@ -45,7 +44,7 @@ class TextEncoder:
 
             index += 1
 
-            if index >= (2**14) - RESERVED_WORDS:
+            if index >= (2**15) - RESERVED_WORDS:
                 break
 
         self.avg_len /= index - RESERVED_WORDS
@@ -56,10 +55,10 @@ class TextEncoder:
         elif word == b'\n':
             return NEWLINE_BYTE
 
-        # logging.debug(f"Encoding word \"{word}\"")
+        logging.debug(f"Encoding word \"{word}\"")
 
         if b' ' in word:
-            # logging.debug("Space found in word while encoding")
+            logging.error("Space found in word while encoding")
             return
         elif word not in self.word_indexes:
             output = FLAG_BYTE
@@ -68,15 +67,14 @@ class TextEncoder:
 
             output += FLAG_BYTE
 
-            # logging.debug("Word not found in common words, converting to raw utf8")
-            # logging.debug(f'Bytes: {output}, Length: {len(output)}')
-
             return output
 
         # Ok now we encode
         b = ""
         index: int = self.word_indexes[word]
         num: str = bin(index)[2:]
+        if len(num) > 15:
+            logging.error(f'Length of word "{word} is over 15 bits."')
 
         if len(num) > 7:
             b += '1'
@@ -104,16 +102,16 @@ class TextEncoder:
 
             out += SPACE_BYTE
             raw = raw[space_index+1:]
-            logging.debug(raw)
 
             space_index = raw.find(b' ')
 
-        out += self.encode_word(raw) # Encode the last word
+        if raw:
+            out += self.encode_word(raw) # Encode the last word
 
         return out
 
     def decode_word(self, word: bytes) -> str:
-        offset = len(word) == 2
+        offset: bool = len(word) == 2
 
         logging.debug(f"Decoding word \"{word}\"")
 
@@ -121,15 +119,13 @@ class TextEncoder:
             logging.error("Word was None.")
             return ''
 
-        if word[0] == 1:
-            unicode = word[1:-1]
-            return unicode.decode()
-
         index = int.from_bytes(word, "big")
 
+        logging.debug(f"Index found for word is {index}")
         # This needs to be done because 2 bytes words have a 1 at the start, which will offset the index. By A LOT
         if offset:
             index -= MAGIC_NUMBER
+            logging.debug(f"Word is 2 bytes, offsetting index... Result: {index}")
 
         return self.words[index]
 
@@ -139,24 +135,33 @@ class TextEncoder:
     def decode(self, raw: bytes) -> str:
         out = ""
 
-        space_index: int = raw.find(SPACE_BYTE)
-        while (space_index != -1):
-            out += self.decode_word(raw[:space_index])
+        while raw:
+            double = 1
+            byte = raw[0]
 
-            out += ' '
-            raw = raw[space_index+1:]
+            # 1 signals the start of a raw UTf-8 string
+            if byte == 1:
+                end_utf_index = raw[1:].find(FLAG_BYTE)
 
-            space_index = raw.find(SPACE_BYTE)
+                out += raw[1:end_utf_index + 1].decode()
+                raw = raw[end_utf_index + 2:]
 
-        out += self.decode_word(raw)
+            else:
+
+                # The best way to check if a word is over 1 byte i think
+                if byte >= 128:
+                    double = 2
+
+                out += self.decode_word(raw[0:double])
+                raw = raw[double:]
 
         return out
 
     def encode_file(self, file_path: str) -> str:
         write_bytes = bytes()
-        with open(file_path, 'r') as file:
-            for line in file.readlines():
-                write_bytes += self.encode(line)
+        with open(file_path, 'rb') as file:
+            line = file.read()
+            write_bytes = self.encode(line)
 
         new_file_path = file_path[:len(file_path) - len(file_path.split('.')[-1]) - 1] + '-encoded.' + file_path.split('.')[-1]
         with open(new_file_path, 'wb+') as file:
@@ -165,70 +170,6 @@ class TextEncoder:
         return new_file_path
 
     def decode_file(self, file_path: str) -> str:
-
-        t = ""
         with open(file_path, 'rb') as file:
-            for line in file.readlines():
-                t += self.decode(line)
-
-        return t
-
-
-# foo = TextEncoder('./wiki-100k.txt')
-
-# sample = "The quick brown fox jumped over the lazy dog"
-
-# print('My Encoding')
-# print(x := foo.encode(sample))
-# print(len(x))
-# print(foo.decode(x))
-
-# print()
-
-# print("UTF-8")
-# print(len(sample.encode('utf-8')))
-
-# x = foo.encode_file('test.txt')
-# print(foo.decode_file(x))
-
-
-
-
-# print(len(x))
-# i = int.from_bytes(x, "big")
-# i -= MAGIC_NUMBER
-# print(i)
-# print(foo.words[i])
-
-
-# exit()
-
-
-
-# utf = sample.encode()
-# trials = 100
-
-# t = timeit.Timer(sample.encode)
-# utf_time = t.timeit(trials)
-
-
-# output = foo.encode(sample)
-
-# t = timeit.Timer(lambda: foo.encode(sample))
-# mine_time = t.timeit(trials)
-
-# print("My Text Encoder")
-# print(output)
-# print(len(output))
-# print(f"My time: {mine_time}")
-# print("UTF-8")
-# print(utf)
-# print(len(utf))
-# print(f"UTF Time: {utf_time}")
-
-# percent_gain = round(len(output) * 100/len(utf), 3)
-
-# print(f'\nGain: {percent_gain}%')
-
-# with open('out', 'wb+') as file:
-#     file.write(output)
+            line = file.read()
+            return self.decode(line)

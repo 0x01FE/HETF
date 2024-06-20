@@ -9,10 +9,10 @@ So assuming we're using 16 bits per word we can shorten the most common `65536` 
 ```
 0xxxxxxx
 
-10xxxxxx xxxxxxxx
+1xxxxxxx xxxxxxxx
 ```
 
-This of course ends up wasting 1-2 bits, so rather than 2^16 combintations available we're down to 2^14 (16384).
+This of course ends up wasting 1-2 bits, so rather than 2^16 combintations available we're down to 2^15 (32768).
 
 ## Plural Bit
 
@@ -22,7 +22,7 @@ Not sure how much if any space you would save with this.
 
 ## Other Words
 
-There's one very large flaw with this system though, how do we deal with words that aren't in the top 16384 most common words? We need to deal with random strings of characters still. The obvious solution is to have some sort of identifier that says "hey everything after this is RAW unicode characters", with some sort of terminating character.
+There's one very large flaw with this system though, how do we deal with words that aren't in the top 32768 most common words? We need to deal with random strings of characters still. The obvious solution is to have some sort of identifier that says "hey everything after this is RAW unicode characters", with some sort of terminating character.
 
 Since we're going to be a little wasting space with words that aren't the most common, these flag characters should be
     - The same character
