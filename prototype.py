@@ -6,8 +6,12 @@ logging.basicConfig(encoding="utf-8", level=logging.INFO, format=FORMAT)
 SPACE_BYTE = (0).to_bytes(1, byteorder='big')
 FLAG_BYTE = (1).to_bytes(1, byteorder='big')
 NEWLINE_BYTE = (2).to_bytes(1, byteorder='big')
+
 MAGIC_NUMBER = 32768
-RESERVED_WORDS = 3
+
+SPECIAL_BYTES = [' ', None, '\n']
+PUNCTUATION_BYTES = [b'.', b',', b'\'', b'\"', b'(', b')', b'{', b'}', b'-']
+RESERVED_WORDS = len(SPECIAL_BYTES + PUNCTUATION_BYTES)
 
 class TextEncoder:
     word_indexes: dict
@@ -17,12 +21,20 @@ class TextEncoder:
     def __init__(self, file_path: str):
         self.word_indexes = {}
         self.avg_len = 0
-        self.words = [' ', None, '\n']
+        self.words = SPECIAL_BYTES + [byte.decode() for byte in PUNCTUATION_BYTES]
 
         self.read_file(file_path)
 
     def read_file(self, file_path: str) -> None:
 
+        # Add Punctuation bytes after reserved special byte space
+        index = len(SPECIAL_BYTES)
+        for char in PUNCTUATION_BYTES:
+            self.word_indexes[char] = index
+
+            index += 1
+
+        # Add the other words
         with open(file_path, 'r', encoding='utf-8') as file:
             data = file.readlines()
 
@@ -58,9 +70,11 @@ class TextEncoder:
         logging.debug(f"Encoding word \"{word}\"")
 
         if b' ' in word:
-            logging.error("Space found in word while encoding")
+            logging.error("ENCODING WORD - Space found in word while encoding")
             return
         elif word not in self.word_indexes:
+            logging.debug(f"ENCODING WORD - Writing raw UTF-8 with flag bytes... {word}")
+
             output = FLAG_BYTE
 
             output += word
@@ -89,24 +103,44 @@ class TextEncoder:
 
         return int(b, 2).to_bytes(len(b) // 8, byteorder='big')
 
+    # TODO @0x01fe : There's some repeated logic between encode and encode_word when checking if its in word_indexes. Please simplify
     def encode(self, raw: bytes | str) -> bytes:
         if type(raw) == str:
             raw = raw.encode()
 
         out = bytes()
 
-        space_index: int = raw.find(b' ')
-        while (space_index != -1):
+        while raw:
+            current_index = 0
+            add = 0
+            word_found = False
+            for byte in raw:
+                logging.debug(f'ENCODING - Current Byte: {byte}')
 
-            out += self.encode_word(raw[:space_index])
+                if not self._int_is_alpha_or_space(byte):
+                    if word_found := (raw[:current_index] in self.word_indexes):
+                        logging.debug(f'ENCODING - Word {raw[:current_index]} found in indexes with non-alpha character.')
+                        out += self.encode_word(raw[:current_index])
 
-            out += SPACE_BYTE
-            raw = raw[space_index+1:]
+                        break
 
-            space_index = raw.find(b' ')
+                if (word_found := (byte == 32)): # 32 is for a space
+                    logging.debug(f"ENCODING - Word found through space character: {raw[:current_index]}")
+                    out += self.encode_word(raw[:current_index])
 
-        if raw:
-            out += self.encode_word(raw) # Encode the last word
+                    # Don't forget to encode the space
+                    out += self.encode_word(raw[current_index:current_index + 1])
+                    add = 1
+
+                    break
+
+                current_index += 1
+
+            if not word_found:
+                logging.debug(f'ENCODING - Word not found, encoding what the leftovers {raw[:current_index]}')
+                out += self.encode_word(raw[:current_index])
+
+            raw = raw[current_index + add:]
 
         return out
 
@@ -129,9 +163,6 @@ class TextEncoder:
 
         return self.words[index]
 
-    """
-    Works much like the inverse of encoding for some reason...
-    """
     def decode(self, raw: bytes) -> str:
         out = ""
 
@@ -142,7 +173,8 @@ class TextEncoder:
             # 1 signals the start of a raw UTf-8 string
             if byte == 1:
                 end_utf_index = raw[1:].find(FLAG_BYTE)
-
+                logging.debug(f'DECODING - Decoding raw UTF-8... {raw[1:end_utf_index + 1]}')
+                logging.debug(f'DECODING - Raw: {raw}')
                 out += raw[1:end_utf_index + 1].decode()
                 raw = raw[end_utf_index + 2:]
 
@@ -173,3 +205,6 @@ class TextEncoder:
         with open(file_path, 'rb') as file:
             line = file.read()
             return self.decode(line)
+
+    def _int_is_alpha_or_space(self, num: int) -> bool:
+        return (num == 32) or ((num >= 65 and num <= 90) or (num >= 97 and num <= 122))
