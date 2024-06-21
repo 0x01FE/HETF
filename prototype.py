@@ -67,13 +67,13 @@ class TextEncoder:
         elif word == b'\n':
             return NEWLINE_BYTE
 
-        logging.debug(f"Encoding word \"{word}\"")
+        # logging.debug(f"ENCODING WORD - Word: \"{word}\"")
 
         if b' ' in word:
             logging.error("ENCODING WORD - Space found in word while encoding")
             return
         elif word not in self.word_indexes:
-            logging.debug(f"ENCODING WORD - Writing raw UTF-8 with flag bytes... {word}")
+            # logging.debug(f"ENCODING WORD - Writing raw UTF-8 with flag bytes... {word}")
 
             output = FLAG_BYTE
 
@@ -88,7 +88,7 @@ class TextEncoder:
         index: int = self.word_indexes[word]
         num: str = bin(index)[2:]
         if len(num) > 15:
-            logging.error(f'Length of word "{word} is over 15 bits."')
+            logging.error(f'ENCODING WORD - Length of word "{word} is over 15 bits."')
 
         if len(num) > 7:
             b += '1'
@@ -99,7 +99,7 @@ class TextEncoder:
             b += '0' * (8 - len(num))
             b += num
 
-        logging.debug(f'Bytes: {b}, Length: {len(b)}')
+        # logging.debug(f'ENCODING WORD - Bytes: {b}, Length: {len(b)}')
 
         return int(b, 2).to_bytes(len(b) // 8, byteorder='big')
 
@@ -112,42 +112,41 @@ class TextEncoder:
 
         while raw:
             current_index = 0
-            add = 0
             word_found = False
             for byte in raw:
-                logging.debug(f'ENCODING - Current Byte: {byte}')
+                # logging.debug(f'ENCODING - Current Byte: {byte}')
 
                 if not self._int_is_alpha_or_space(byte):
                     if word_found := (raw[:current_index] in self.word_indexes):
-                        logging.debug(f'ENCODING - Word {raw[:current_index]} found in indexes with non-alpha character.')
+                        # logging.debug(f'ENCODING - Word {raw[:current_index]} found in indexes with non-alpha character.')
                         out += self.encode_word(raw[:current_index])
 
                         break
 
                 if (word_found := (byte == 32)): # 32 is for a space
-                    logging.debug(f"ENCODING - Word found through space character: {raw[:current_index]}")
+                    # logging.debug(f"ENCODING - Word found through space character: {raw[:current_index]}")
                     out += self.encode_word(raw[:current_index])
 
                     # Don't forget to encode the space
-                    out += self.encode_word(raw[current_index:current_index + 1])
-                    add = 1
+                    out += SPACE_BYTE
+                    current_index += 1
 
                     break
 
                 current_index += 1
 
             if not word_found:
-                logging.debug(f'ENCODING - Word not found, encoding what the leftovers {raw[:current_index]}')
+                # logging.debug(f'ENCODING - Word not found, encoding what the leftovers {raw[:current_index]}')
                 out += self.encode_word(raw[:current_index])
 
-            raw = raw[current_index + add:]
+            raw = raw[current_index:]
 
         return out
 
     def decode_word(self, word: bytes) -> str:
         offset: bool = len(word) == 2
 
-        logging.debug(f"Decoding word \"{word}\"")
+        # logging.debug(f"Decoding word \"{word}\"")
 
         if not word:
             logging.error("Word was None.")
@@ -155,11 +154,11 @@ class TextEncoder:
 
         index = int.from_bytes(word, "big")
 
-        logging.debug(f"Index found for word is {index}")
+        # logging.debug(f"Index found for word is {index}")
         # This needs to be done because 2 bytes words have a 1 at the start, which will offset the index. By A LOT
         if offset:
             index -= MAGIC_NUMBER
-            logging.debug(f"Word is 2 bytes, offsetting index... Result: {index}")
+            # logging.debug(f"Word is 2 bytes, offsetting index... Result: {index}")
 
         return self.words[index]
 
@@ -173,8 +172,8 @@ class TextEncoder:
             # 1 signals the start of a raw UTf-8 string
             if byte == 1:
                 end_utf_index = raw[1:].find(FLAG_BYTE)
-                logging.debug(f'DECODING - Decoding raw UTF-8... {raw[1:end_utf_index + 1]}')
-                logging.debug(f'DECODING - Raw: {raw}')
+                # logging.debug(f'DECODING - Decoding raw UTF-8... {raw[1:end_utf_index + 1]}')
+                # logging.debug(f'DECODING - Raw: {raw}')
                 out += raw[1:end_utf_index + 1].decode()
                 raw = raw[end_utf_index + 2:]
 
